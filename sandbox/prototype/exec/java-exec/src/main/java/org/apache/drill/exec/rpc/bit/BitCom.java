@@ -17,53 +17,34 @@
  ******************************************************************************/
 package org.apache.drill.exec.rpc.bit;
 
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.util.concurrent.GenericFutureListener;
-
 import java.io.Closeable;
 
-import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.exception.DrillbitStartupException;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
-import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
-import org.apache.drill.exec.proto.ExecProtos.FragmentStatus;
-import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
-import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
-import org.apache.drill.exec.record.RecordBatch;
-import org.apache.drill.exec.rpc.DrillRpcFuture;
-import org.apache.drill.exec.rpc.RpcBus;
+import org.apache.drill.exec.work.fragment.IncomingFragmentHandler;
 
 /**
- * Service that allows one Drillbit to communicate with another. Internally manages whether each particular bit is a server
- * or a client depending on who initially made the connection. If no connection exists, BitCom is
- * responsible for making a connection.  BitCom should automatically straight route local BitCommunication rather than connecting to its self.
+ * Service that allows one Drillbit to communicate with another. Internally manages whether each particular bit is a
+ * server or a client depending on who initially made the connection. If no connection exists, BitCom is responsible for
+ * making a connection. BitCom should automatically straight route local BitCommunication rather than connecting to its
+ * self.
  */
-public interface BitCom extends Closeable{
+public interface BitCom extends Closeable {
 
   /**
-   * Send a record batch to another node.  
-   * @param node The node id to send the record batch to.
-   * @param batch The record batch to send.
-   * @return A Future<Ack> object that can be used to determine the outcome of sending.
-   */
-  public abstract DrillRpcFuture<Ack> sendRecordBatch(FragmentContext context, DrillbitEndpoint node, RecordBatch batch);
-
-  /**
-   * Send a query PlanFragment to another bit.   
-   * @param context
+   * Get a Bit to Bit communication tunnel. If the BitCom doesn't have a tunnel attached to the node already, it will
+   * start creating one. This create the connection asynchronously.
+   * 
    * @param node
-   * @param fragment
    * @return
    */
-  public abstract DrillRpcFuture<FragmentHandle> sendFragment(FragmentContext context, DrillbitEndpoint node, PlanFragment fragment);
-  
-  public abstract DrillRpcFuture<Ack> cancelFragment(FragmentContext context, DrillbitEndpoint node, FragmentHandle handle);
-  
-  public abstract DrillRpcFuture<FragmentStatus> getFragmentStatus(FragmentContext context, DrillbitEndpoint node, FragmentHandle handle);
-  
-  
-  public interface TunnelListener extends GenericFutureListener<ChannelFuture> {
-    public void connectionEstablished(SocketChannel channel, DrillbitEndpoint endpoint, RpcBus<?> bus);
-  }
+  public BitTunnel getTunnel(DrillbitEndpoint node) ;
 
+  public int start() throws InterruptedException, DrillbitStartupException;
+
+  /**
+   * Register an incoming batch handler for a local foreman.  
+   * @param handler
+   */
+  public void registerIncomingBatchHandler(IncomingFragmentHandler handler);
 }

@@ -51,6 +51,8 @@ public abstract class DataType {
   public abstract Comparability getComparability();
   public abstract boolean isNumericType();
   
+  
+  
   public static final DataType LATEBIND = new LateBindType();
   public static final DataType BOOLEAN = new AtomType("BOOLEAN", Comparability.EQUAL, false);
   public static final DataType BYTES = new AtomType("BYTES", Comparability.ORDERED, false);
@@ -61,6 +63,8 @@ public abstract class DataType {
   public static final DataType FLOAT64 = new AtomType("FLOAT64", Comparability.ORDERED, true);
   public static final DataType INT64 = new AtomType("INT64", Comparability.ORDERED, true);
   public static final DataType INT32 = new AtomType("INT32", Comparability.ORDERED, true);
+  public static final DataType INT16 = new AtomType("INT16", Comparability.ORDERED, true);
+  public static final DataType UINT16 = new AtomType("UINT16", Comparability.ORDERED, true);
 //  public static final DataType INT16 = new AtomType("int16", Comparability.ORDERED, true);
 //  public static final DataType BIG_INTEGER = new AtomType("bigint", Comparability.ORDERED, true);
 //  public static final DataType BIG_DECIMAL = new AtomType("bigdecimal", Comparability.ORDERED, true);
@@ -70,6 +74,17 @@ public abstract class DataType {
   public static final DataType ARRAY = new AtomType("ARRAY", Comparability.NONE, false);
   public static final DataType NULL = new AtomType("NULL", Comparability.NONE, false);
   
+  //TODO: Hack to get some size data, needs to be fixed so that each type reveals it's size.
+  public int size(){
+    if(this == BOOLEAN){
+      return 1;
+    }else if(this == INT32){
+      return 4;
+    }else if(this == INT16){
+      return 4;
+    }
+    return 2;
+  }
   
   static final Map<String, DataType> TYPES;
   static {
