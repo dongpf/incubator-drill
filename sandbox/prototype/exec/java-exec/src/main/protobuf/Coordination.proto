@@ -2,7 +2,7 @@ package exec;
 
 option java_package = "org.apache.drill.exec.proto";
 option java_outer_classname = "CoordinationProtos";
-option optimize_for = LITE_RUNTIME;
+option optimize_for = SPEED;
 
 message DrillbitEndpoint{
   optional string address = 1;
@@ -15,12 +15,6 @@ message DrillServiceInstance{
   optional string id = 1;
   optional int64 registrationTimeUTC = 2;
   optional DrillbitEndpoint endpoint = 3;
-}
-
-message WorkQueueStatus{
-	optional DrillbitEndpoint endpoint = 1;
-	optional int32 queue_length = 2;
-	optional int64 report_time = 3;
 }
 
 message Roles{

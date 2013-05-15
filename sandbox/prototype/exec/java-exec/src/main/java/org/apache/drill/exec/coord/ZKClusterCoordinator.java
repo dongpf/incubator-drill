@@ -17,27 +17,31 @@
  ******************************************************************************/
 package org.apache.drill.exec.coord;
 
+import static com.google.common.base.Throwables.propagate;
+import static com.google.common.collect.Collections2.transform;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.drill.common.config.DrillConfig;
+import org.apache.drill.exec.ExecConstants;
+import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
+
 import com.google.common.base.Function;
 import com.netflix.curator.RetryPolicy;
 import com.netflix.curator.framework.CuratorFramework;
 import com.netflix.curator.framework.CuratorFrameworkFactory;
 import com.netflix.curator.framework.state.ConnectionState;
+import com.netflix.curator.framework.state.ConnectionStateListener;
 import com.netflix.curator.retry.RetryNTimes;
 import com.netflix.curator.x.discovery.ServiceDiscovery;
 import com.netflix.curator.x.discovery.ServiceDiscoveryBuilder;
 import com.netflix.curator.x.discovery.ServiceInstance;
 import com.netflix.curator.x.discovery.details.ServiceCache;
 import com.netflix.curator.x.discovery.details.ServiceCacheListener;
-import org.apache.drill.common.config.DrillConfig;
-import org.apache.drill.exec.ExecConstants;
-import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Collections;
-
-import static com.google.common.base.Throwables.propagate;
-import static com.google.common.collect.Collections2.transform;
 
 /**
  * Manages cluster coordination utilizing zookeeper. *
@@ -51,6 +55,7 @@ public class ZKClusterCoordinator extends ClusterCoordinator {
   private ServiceCache<DrillbitEndpoint> serviceCache;
   private volatile Collection<DrillbitEndpoint> endpoints = Collections.emptyList();
   private final String serviceName;
+  private final CountDownLatch initialConnection = new CountDownLatch(1);
 
   public ZKClusterCoordinator(DrillConfig config) throws IOException {
 
@@ -63,6 +68,7 @@ public class ZKClusterCoordinator extends ClusterCoordinator {
       .retryPolicy(rp)
       .connectString(config.getString(ExecConstants.ZK_CONNECTION))
       .build();
+    curator.getConnectionStateListenable().addListener(new InitialConnectionListener());
     discovery = getDiscovery();
     serviceCache = discovery.
       serviceCacheBuilder()
@@ -71,15 +77,36 @@ public class ZKClusterCoordinator extends ClusterCoordinator {
       .build();
   }
 
-  public void start() throws Exception {
+  public void start(long millisToWait) throws Exception {
     logger.debug("Starting ZKClusterCoordination.");
     curator.start();
     discovery.start();
     serviceCache.start();
     serviceCache.addListener(new ZKListener());
+    
+    if(millisToWait != 0){
+      boolean success = this.initialConnection.await(millisToWait, TimeUnit.MILLISECONDS);
+      if(!success) throw new IOException(String.format("Failure to connect to the zookeeper cluster service within the allotted time of %d milliseconds.", millisToWait));
+    }else{
+      this.initialConnection.await();
+    }
+    
+    
     updateEndpoints();
   }
+  
+  private class InitialConnectionListener implements ConnectionStateListener{
 
+    @Override
+    public void stateChanged(CuratorFramework client, ConnectionState newState) {
+      if(newState == ConnectionState.CONNECTED){
+        ZKClusterCoordinator.this.initialConnection.countDown();
+        client.getConnectionStateListenable().removeListener(this);
+      }
+    }
+    
+  }
+  
   private class ZKListener implements ServiceCacheListener {
 
     @Override
